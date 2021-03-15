@@ -19,10 +19,6 @@ use lib qw( ../lib );
 use Template;
 use Template::Test;
 
-my $template = Template->new(
-    STRICT => 1
-);
-
 test_expect(
     \*DATA, 
     { STRICT => 1 }, 
