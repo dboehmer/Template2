@@ -30,6 +30,8 @@ our $DEBUG      = 0 unless defined $DEBUG;
 our $PRIVATE    = qr/^[_.]/;
 our $UNDEF_TYPE = 'var.undef';
 our $UNDEF_INFO = 'undefined variable: %s';
+our $INEXIST_TYPE = 'var.inexistent';
+our $INEXIST_INFO = 'inexistent variable: %s';
 
 # alias _dotop() to dotop() so that we have a consistent method name
 # between the Perl and XS stash implementations
@@ -206,7 +208,7 @@ sub declone {
 
 sub get {
     my ($self, $ident, $args) = @_;
-    my ($root, $result);
+    my ($root, @result);
     $root = $self;
 
     if (ref $ident eq 'ARRAY'
@@ -219,17 +221,28 @@ sub get {
         # ($self) as the first implicit 'result'...
         
         foreach (my $i = 0; $i <= $size; $i += 2) {
-            $result = $self->_dotop($root, @$ident[$i, $i+1]);
-            last unless defined $result;
-            $root = $result;
+            @result = $self->_dotop($root, @$ident[$i, $i+1]);
+            last unless defined $result[0];
+            $root = $result[0];
         }
     }
     else {
-        $result = $self->_dotop($root, $ident, $args);
+        @result = $self->_dotop($root, $ident, $args);
+    }
+warn "get(): \@result == " . scalar @result;
+
+    if( @result == 0 ) {
+        die Template::Exception->new(
+            $INEXIST_TYPE, 
+            sprintf(
+                $INEXIST_INFO,
+                $self->_reconstruct_ident($ident)
+            )
+        );
     }
 
-    return defined $result 
-        ? $result 
+    return defined $result[0]
+        ? $result[0]
         : $self->undefined($ident, $args);
 }
 
@@ -354,22 +367,11 @@ sub update {
 
 sub undefined {
     my ($self, $ident, $args) = @_;
-
-    if ($self->{ _STRICT }) {
-        # Sorry, but we can't provide a sensible source file and line without
-        # re-designing the whole architecture of TT (see TT3)
-        die Template::Exception->new(
-            $UNDEF_TYPE, 
-            sprintf(
-                $UNDEF_INFO, 
-                $self->_reconstruct_ident($ident)
-            )
-        ) if $self->{ _STRICT };
-    }
-    else {
-        # There was a time when I thought this was a good idea. But it's not.
-        return '';
-    }
+use Carp;
+#Carp::cluck "calls undefined()";
+    return $self->{ _STRICT }
+        ? undef
+        : '';
 }
 
 sub _reconstruct_ident {
@@ -569,7 +571,12 @@ sub _dotop {
         die "$item is undefined\n";         ## DIE
     }
 
-    return undef;
+    if( @result > 0 ) {
+        return undef;
+    }
+    else {
+        return ();
+    }
 }
 
 

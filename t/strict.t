@@ -19,10 +19,12 @@ use lib qw( ../lib );
 use Template;
 use Template::Test;
 
+local $Template::Config::STASH = 'Template::Stash';
+
 test_expect(
     \*DATA, 
     { STRICT => 1 }, 
-    { foo => 10, bar => undef, baz => { boz => undef } }
+    { foo => 10, bar => undef, baz => { boz => undef }, empty => '' }
 );
 
 __DATA__
@@ -33,32 +35,51 @@ __DATA__
 10
 
 -- test --
--- name variable with undefined value --
-[% TRY; bar; CATCH; error; END %]
+-- name variable with empty string --
+[% empty %]
 -- expect --
-var.undef error - undefined variable: bar
+# empty output
 
 -- test --
--- name dotted variable with undefined value --
-[% TRY; baz.boz; CATCH; error; END %]
+-- name inexistent variable --
+[% TRY; bla; CATCH; error; END %]
 -- expect --
-var.undef error - undefined variable: baz.boz
+var.inexistent error - inexistent variable: bla
 
 -- test --
--- name undefined first part of dotted.variable --
-[% TRY; wiz.bang; CATCH; error; END %]
+-- name undefined variable --
+[%# TRY; bar; CATCH; error; END %]
+[% bar %]
 -- expect --
-var.undef error - undefined variable: wiz.bang
+# TODO warning
+# empty string
 
 -- test --
--- name undefined second part of dotted.variable --
-[% TRY; baz.booze; CATCH; error; END %]
+-- name existence of inexistent variable --
+[% TRY; IF bla.exists; 'true'; ELSE; 'false'; END; CATCH; error; END %]
 -- expect --
-var.undef error - undefined variable: baz.booze
+false
 
 -- test --
--- name dotted.variable with args --
-[% TRY; baz(10).booze(20, 'blah', "Foo $foo"); CATCH; error; END %]
+-- name definedness of inexistent variable --
+[% TRY; IF bla.defined; 'true'; ELSE; 'false'; END; CATCH; error; END %]
 -- expect --
-var.undef error - undefined variable: baz(10).booze(20, 'blah', 'Foo 10')
+var.inexistent error - inexistent variable: bla.defined
 
+-- test --
+-- name definedness of undefined variable --
+[% IF bar.defined; 'true'; ELSE; 'false'; END %]
+-- expect --
+false
+
+-- test --
+-- name truthiness of undefined variable --
+[% IF bar; 'true'; ELSE; 'false'; END %]
+-- expect --
+false
+
+-- test --
+-- name truthiness of inexistent variable --
+[% TRY; IF bla; 'true'; ELSE; 'false'; END; CATCH; error; END %]
+-- expect --
+var.inexistent error - inexistent variable: bla
